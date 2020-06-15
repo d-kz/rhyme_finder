@@ -4,12 +4,6 @@ import codecs
 import re
 
 
-def vowel_similarity():
-    return 1.0
-
-
-def consonant_similairyt():
-    return 1.0
 
 
 def transcribe_song_fr(text):

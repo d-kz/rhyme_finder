@@ -2,7 +2,7 @@ from lyrics import Lyrics
 from colored import fg, bg, attr
 import random
 
-file_name = 'lyrics_fr/Feu_Zoe.txt'
+file_name = 'lyrics_fr/Feu_Zoe_shortest.txt'
 
 language = 'fr'
 print_stats = True

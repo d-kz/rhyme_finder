@@ -18,15 +18,48 @@ class Word:
         self.transcription = transcribed_word
         self.vowels = []
         self.consonants = []
-        for char in self.transcription:
-            if char in vowel_str:
-                self.vowels.append(char)
-            else:
+        is_cons = lambda char: char not in vowel_str
+
+        # Syllable analysis
+        syllable = ''
+        self.syllables = []
+        i = 0
+        length = len(self.transcription)
+        while i < length:
+            char = self.transcription[i]
+            # collect chars until vowel is found, then +1 consonant
+            if is_cons(char):
                 self.consonants.append(char)
+                syllable += char
+                i += 1
+            # vowel found
+            else:
+                self.vowels.append(char)
+                syllable += char
+                i += 1
+                # if char after is a consonant, add that too
+                # only update if yes, otherwise, just continue as normal
+                if (i < length) and is_cons(self.transcription[i]):
+                    char = self.transcription[i]
+                    self.consonants.append(char)
+                    syllable += char
+                    self.syllables.append(syllable)
+                    syllable = ''
+                    i += 1
+                else:
+                    self.syllables.append(syllable)
+                    syllable = ''
+
 
     def __str__(self):
+        """
+        Overwrite for printing
+        :return:
+        """
         return self.word.encode('utf8') + "_" + self.transcription.encode('utf8') + "_" +\
         ''.join(self.vowels).encode('utf8') + ''.join(self.consonants).encode('utf8')
+
+    # def split_syllables(self):
 
 
 
@@ -36,6 +69,10 @@ class Word:
 class Lyrics:
     """
     # Vowel source: https://www.lawlessfrench.com/pronunciation/ipa-vowels/
+    Model example from WSF:
+        - https://graphics.wsj.com/hamilton-methodology/
+            - As we did with vowel sounds, we score syllable pairs based on how similar their suffixes sound
+        - http://graphics.wsj.com/hamilton/
     """
     def __init__(self, filename, language='fi',
                  lookback=10, vowel_CM=None, consotant_CM=None, vowel_string=u'aɑeɛəœøioɔuyɑ̃ɛ̃ɔ̃œ̃jwɥ',
@@ -50,9 +87,6 @@ class Lyrics:
         self.vowels = vowel_string
         # Characters to not remove during cleaning
         self.rx_letters_to_keep = re.compile(u"[^\w{}'’\n]+".format(special_chars)) # '^' - not. '+' - one or more.
-
-        self.lookback = lookback
-        self.filename = filename
 
         self.language = language  # to pass to transcriber
         self.lookback = lookback  # How many previous words are checked for a rhyme.
@@ -75,6 +109,17 @@ class Lyrics:
         #     cleaning_ok = self.clean_text(self.text_raw)
         #     self.compute_vowel_representation()
         #     self.avg_rhyme_length, self.longest_rhyme = self.rhyme_stats()
+
+    def vowel_similarity(self, thresh):
+        """
+        Cutoff histogram at thresh percentage of values
+        :return: hashmap of similar sounding transcription sounds, with scores.
+        """
+        return 1.0
+
+    def consonant_similairty(self, thresh):
+        return 1.0
+
 
 
     def clean_text(self, text):
@@ -127,5 +172,17 @@ class Lyrics:
             self.words.append(new_word)
             print new_word
 
+    def rhyme_alignment(self, window):
+        """
+        Slide through word list using [window X window] comparison word matrix.
+        Could do syllabus instead too?
+        :param window:
+        :return:
+        """
 
+        # 1) Vowels
+        # Exact matching
+        # Weak matching
+
+        # Consonants
 
