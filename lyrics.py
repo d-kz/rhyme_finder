@@ -9,13 +9,13 @@ import phonetics as ph
 
 
 class Word:
-    def __init__(self, text, vowel_str):
+    def __init__(self, text, transcribed_word, vowel_str):
         self.new_line = False
         if '\n' in text:
             text = text[0:-1]
             self.new_line = True
         self.word = text
-        self.transcription = ph.transcribe_song_fr(self.word)
+        self.transcription = transcribed_word
         self.vowels = []
         self.consonants = []
         for char in self.transcription:
@@ -49,7 +49,7 @@ class Lyrics:
         # Language vowels
         self.vowels = vowel_string
         # Characters to not remove during cleaning
-        self.rx_letters_to_keep = re.compile(u"[^\w{}'’\.\?!\n]+".format(special_chars)) # '^' - not. '+' - one or more.
+        self.rx_letters_to_keep = re.compile(u"[^\w{}'’\n]+".format(special_chars)) # '^' - not. '+' - one or more.
 
         self.lookback = lookback
         self.filename = filename
@@ -63,6 +63,7 @@ class Lyrics:
         text_raw = f.read()
         f.close()
         self.text = self.clean_text(text_raw)
+        self.transcribed_text = ph.transcribe_song_fr(self.text)
         self.process_transcription()
 
         self.rhyme_map = {}  # to keep track of rhymes
@@ -100,16 +101,29 @@ class Lyrics:
             uniq_lines.add(l)
             new_text += l + '\n'
 
+        # add extra space after newline for cohesive spacing
         new_text = re.sub('\n', '\n ', new_text)
+        self.record_new_lines(new_text)
+
+        new_text = re.sub('\n', ' ', new_text) # new line replace
+        new_text = re.sub('  ', ' ', new_text) # double space replace
         return new_text
 
+    def record_new_lines(self, text):
+        words = re.split(" ", text)
+        newlines = []
+        for i, word in enumerate(words):
+            if '\n' in word:
+                newlines.append(i)
+        self.new_lines = newlines
 
     def process_transcription(self):
         words = re.split(" ", self.text)
+        transcribed_words = re.split(" ", self.transcribed_text)
 
         self.words = []
-        for word in words:
-            new_word = Word(word, self.vowels)
+        for i in range(len(words)):
+            new_word = Word(words[i], transcribed_words[i], self.vowels)
             self.words.append(new_word)
             print new_word
 
