@@ -2,11 +2,26 @@
 
 import codecs
 import re
-import numpy as np
-import os
+import queue
 
 import phonetics as ph
 
+"""
+TODOs:
+(need)
+- Sliding window across syllables
+- Confusion matrices
+    - input
+    - cutoff logic
+- Heuristic for rhyme computation: vowel alignment, consonant similarity
+- assemble lyrics back with highlighting (from previous version)
+(nice)
+- breakup rhyme highlighting by syllable: map transcription to original
+- filter 'bad' rhymes
+- what was their annealing for printing?
+DONE:
+- Syllable breakup
+"""
 
 class Word:
     def __init__(self, text, transcribed_word, vowel_str):
@@ -20,7 +35,7 @@ class Word:
         self.consonants = []
         is_cons = lambda char: char not in vowel_str
 
-        # Syllable analysis
+        # Syllable analysis, adding vowels/consonants to arrays.
         syllable = ''
         self.syllables = []
         i = 0
@@ -59,8 +74,6 @@ class Word:
         return self.word.encode('utf8') + "_" + self.transcription.encode('utf8') + "_" +\
         ''.join(self.vowels).encode('utf8') + ''.join(self.consonants).encode('utf8')
 
-    # def split_syllables(self):
-
 
 
 
@@ -77,6 +90,16 @@ class Lyrics:
     def __init__(self, filename, language='fi',
                  lookback=10, vowel_CM=None, consotant_CM=None, vowel_string=u'aɑeɛəœøioɔuyɑ̃ɛ̃ɔ̃œ̃jwɥ',
                  special_chars=u'éêèéœçâîôûàìòùëïü'):
+        """
+
+        :param filename:
+        :param language:
+        :param lookback: minimum number of syllables to look at (whatever exceeds from the same word is kept)
+        :param vowel_CM:
+        :param consotant_CM:
+        :param vowel_string:
+        :param special_chars:
+        """
 
 
         # Confusion Matrices:
@@ -100,11 +123,12 @@ class Lyrics:
         self.transcribed_text = ph.transcribe_song_fr(self.text)
         self.process_transcription()
 
-        self.rhyme_map = {}  # to keep track of rhymes
+        # self.rhyme_map = {}  # to keep track of rhymes
 
 
 
         # Start analysis, if parsed text exists:
+        self.rhyme_alignment()
         # if self.text_raw is not None:
         #     cleaning_ok = self.clean_text(self.text_raw)
         #     self.compute_vowel_representation()
@@ -172,17 +196,54 @@ class Lyrics:
             self.words.append(new_word)
             print new_word
 
-    def rhyme_alignment(self, window):
+    def rhyme_alignment(self):
         """
         Slide through word list using [window X window] comparison word matrix.
         Could do syllabus instead too?
-        :param window:
         :return:
         """
+        syllable_window_q = []
+        # mimics syllable queue, but only with word ids (needed to match words to syllables later)
+        word_id_q = []
+        i = 0
+        while i < len(self.words):
+            if len(syllable_window_q) < self.lookback:
+                word = self.words[i]
+                # insert length of syllables to know how much to remove later
+                for syllable in word.syllables:
+                    # push into queue
+                    word_id_q.insert(0, i)
+                    syllable_window_q.insert(0, syllable)
+                i += 1
+            else:
+                # syllable_list = [el for el in reversed(syllable_window_q)]
+                # word_list = [el for el in reversed(word_id_q)]
+                print "Before", "_".join(syllable_window_q).encode('utf8'), '_'.join([str(num) for num in word_id_q])
+                # TODO: send for analysis here (don't forget to reverse both queues for more intuitive structure)
 
-        # 1) Vowels
+                # keep popping 1 word at a time until the lookback is not below needed again
+                # get word_id of the first word that was pushed onto queue
+                first_word_id = word_id_q[-1]
+                # delete queue until the whole word is removed.
+                while len(word_id_q) > 0:
+                    word_id = word_id_q[-1]
+                    # stop if next word encountered
+                    if word_id != first_word_id:
+                        break
+                    else:
+                        word_id_q.pop()
+                        syllable_window_q.pop()
+
+                print "After", "_".join(syllable_window_q).encode('utf8'), '_'.join([str(num) for num in word_id_q]), '\n'
+
+
+
+
+
+                    # 1) Vowels
         # Exact matching
         # Weak matching
 
         # Consonants
 
+    # def rhyme_heuristic(self, syllable_matrix, similar_vowels, similar_cons):

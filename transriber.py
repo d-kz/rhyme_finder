@@ -2,11 +2,11 @@ from lyrics import Lyrics
 from colored import fg, bg, attr
 import random
 
-file_name = 'lyrics_fr/Feu_Zoe_shortest.txt'
+file_name = 'lyrics_fr/Feu_Zoe_short.txt'
 
 language = 'fr'
 print_stats = True
-lookback = 15
+lookback = 2
 rhyme_cutoff = 2
 l = Lyrics(file_name, language=language, lookback=lookback)
 
