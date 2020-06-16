@@ -8,17 +8,23 @@ import phonetics as ph
 """
 TODOs:
 (need)
-- Sliding window across syllables
-- Confusion matrices
+- Confusion matrices for sounds
     - input
     - cutoff logic
 - Heuristic for rhyme computation: vowel alignment, consonant similarity
-- assemble lyrics back with highlighting (from previous version)
+    - center around vowel, then consonant
+    - not only 2 words can rhyme. Rhyme are transitive: if a -> b and b -> c, then a -> c.
+    Add a graph traversal to identify reachability (matrix multiply), like page-rank. (markov property?)
+- breakup rhyme highlighting by syllable: map transcription to original
+    -  might need text syllables too
 (nice)
+- rhyme pattern symbolic at the end of the line (to see how the rhyming pattern mixes)
 - breakup rhyme highlighting by syllable: map transcription to original
 - filter 'bad' rhymes
 - what was their annealing for printing?
 DONE:
+- assemble lyrics back with highlighting (from previous version)
+- Sliding window across syllables
 - Syllable breakup
 """
 
@@ -38,6 +44,7 @@ class Word:
         syllable = ''
         self.syllables = []
         i = 0
+        vowel_offset = 0
         length = len(self.transcription)
         while i < length:
             char = self.transcription[i]
@@ -45,6 +52,7 @@ class Word:
             if is_cons(char):
                 self.consonants.append(char)
                 syllable += char
+                vowel_offset += 1
                 i += 1
             # vowel found
             else:
@@ -57,12 +65,11 @@ class Word:
                     char = self.transcription[i]
                     self.consonants.append(char)
                     syllable += char
-                    self.syllables.append(syllable)
-                    syllable = ''
                     i += 1
-                else:
-                    self.syllables.append(syllable)
-                    syllable = ''
+
+                self.syllables.append([syllable, vowel_offset])
+                syllable = ''
+                vowel_offset = 0
 
 
     def __str__(self):
@@ -277,34 +284,52 @@ class Lyrics:
         # Ignore rhymes with length 1
         # if rhyme_length >= self.rhyme_cutoff:
         if rhyme_length > 0:
+            syllables_strings = [syl[0] for syl in syllable_list]
             word_i, word_j = word_list[i], word_list[j]
-            rhyme_syllables = ''.join(syllable_list[i:i+rhyme_length]) # TODO: just pick one variant of syllable sounds
+            rhyme_syllables = ''.join(syllables_strings[i:i+rhyme_length]) # TODO: just pick one variant of syllable sounds
             # save word ids with this rhyme
             rhymes = self.rhyme_map.get(rhyme_syllables, [])
             rhymes.append([word_i, word_j, rhyme_length])
             self.rhyme_map[rhyme_syllables] = rhymes
 
 
-    def rhyme_heuristic(self, syl1, syl2):
+    def rhyme_heuristic(self, syl1_tuple, syl2_tuple):
         """
 
-        :param syl1:
+        :param syl1: (syllable, vowel_offset)
         :param syl2:
         :return: int
         """
-        m,n = len(syl1), len(syl2)
-        rhyme_val_mat = np.full((m, n), -0.1) #TODO: should it be neutral or punishing?
-        for i in range(m):
-            for j in range(n):
-                a = syl1[i]
-                b = syl2[j]
-                if a == b:
-                    rhyme_val_mat = 1.0
-                # TODO: add confusion matrix similar sounds
-                # elif
+        syl1, vow1 = syl1_tuple
+        syl2, vow2 = syl2_tuple
 
+        l1,l2 = len(syl1), len(syl2)
+        rhyme = 0.0
+        if syl1[vow1] == syl2[vow2]:
+            rhyme += 1
+            # cons ahead of vowel
+            if vow1+1 < l1 and vow2+1 < l2:
+                if syl1[vow1+1] == syl2[vow2+1]:
+                    rhyme += 0.5
+
+            # cons behind vowel
+            if vow1-1 >= 0 and vow2-1 >= 0:
+                if syl1[vow1-1] == syl2[vow2-1]:
+                    rhyme += 0.5
+
+
+        # rhyme_val_mat = np.full((l1, l2), -0.1) #TODO: should it be neutral or punishing?
+        # for i in range(l1):
+        #     for j in range(l1):
+        #         a = syl1[i]
+        #         b = syl2[j]
+        #         if a == b:
+        #             rhyme_val_mat = 1.0
+        #         # TODO: add confusion matrix similar sounds
+        #         # elif
         # sum of all rhyming sounds
-        rhyme = np.sum(rhyme_val_mat)
+        # rhyme = np.sum(rhyme_val_mat)
+
         return rhyme
 
 

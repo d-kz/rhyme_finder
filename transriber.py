@@ -49,10 +49,9 @@ def print_lyrics(words, rhymes, newlines):
     for rhyme, word_pairs in rhymes:
         for word_pair in word_pairs:
             i, j, l = word_pair
-            print i, j, len(words_rhymes)
-            for offset in range(l): # overwrite with longest rhymes
-                words_rhymes[i+offset] = rhyme
-                words_rhymes[j+offset] = rhyme
+            for syllable_offset in range(l): # overwrite with longest rhymes
+                words_rhymes[i+syllable_offset] = rhyme
+                words_rhymes[j+syllable_offset] = rhyme
 
             # if #vowels in a word != len(rhyme), previous word needs to be included too
             # if word[i]
