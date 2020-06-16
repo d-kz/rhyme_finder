@@ -2,8 +2,7 @@
 
 import codecs
 import re
-import queue
-
+import numpy as np
 import phonetics as ph
 
 """
@@ -123,12 +122,12 @@ class Lyrics:
         self.transcribed_text = ph.transcribe_song_fr(self.text)
         self.process_transcription()
 
-        # self.rhyme_map = {}  # to keep track of rhymes
+        self.rhyme_map = {}  # to keep track of rhymes
 
 
 
         # Start analysis, if parsed text exists:
-        self.rhyme_alignment()
+        self.slide_window_across_words(self.rhyme_heuristic)
         # if self.text_raw is not None:
         #     cleaning_ok = self.clean_text(self.text_raw)
         #     self.compute_vowel_representation()
@@ -196,7 +195,7 @@ class Lyrics:
             self.words.append(new_word)
             print new_word
 
-    def rhyme_alignment(self):
+    def slide_window_across_words(self, rhyme_evaluator):
         """
         Slide through word list using [window X window] comparison word matrix.
         Could do syllabus instead too?
@@ -216,10 +215,13 @@ class Lyrics:
                     syllable_window_q.insert(0, syllable)
                 i += 1
             else:
-                # syllable_list = [el for el in reversed(syllable_window_q)]
-                # word_list = [el for el in reversed(word_id_q)]
-                print "Before", "_".join(syllable_window_q).encode('utf8'), '_'.join([str(num) for num in word_id_q])
-                # TODO: send for analysis here (don't forget to reverse both queues for more intuitive structure)
+
+                # print "Before", "_".join(syllable_window_q).encode('utf8'), '_'.join([str(num) for num in word_id_q])
+
+                # send for rhyme analysis , reverse both queues for more intuitive structure
+                syllable_list = [el for el in reversed(syllable_window_q)]
+                word_list = [el for el in reversed(word_id_q)]
+                self.get_best_rhymes(i, syllable_list, word_list, rhyme_evaluator)
 
                 # keep popping 1 word at a time until the lookback is not below needed again
                 # get word_id of the first word that was pushed onto queue
@@ -234,7 +236,76 @@ class Lyrics:
                         word_id_q.pop()
                         syllable_window_q.pop()
 
-                print "After", "_".join(syllable_window_q).encode('utf8'), '_'.join([str(num) for num in word_id_q]), '\n'
+                # print "After", "_".join(syllable_window_q).encode('utf8'), '_'.join([str(num) for num in word_id_q]), '\n'
+
+
+    def get_best_rhymes(self, word_id_offset, syllable_list, word_list, rhyme_evaluator):
+        """
+        Construct a matrix of rhyme values.
+        Pick the strongest, longest candidates and return them.
+        :param syllable_list:
+        :param word_list:
+        :return:
+        """
+        n = len(syllable_list)
+        rhyme_values_mat = np.full((n, n),-1)
+
+        for i in range(n):
+            for j in range(n):
+                # ignore diagonal (can't rhyme with itself)
+                if i == j:
+                    continue
+                # matrix is symmetric, so ignore if already computed
+                elif rhyme_values_mat[j,i] != -1:
+                    rhyme_values_mat[i, j] = rhyme_values_mat[j,i]
+                # finally, compute actual rhyme score
+                else:
+                    syl1 = syllable_list[i]
+                    syl2 = syllable_list[j]
+                    rhyme_values_mat[i,j] = rhyme_evaluator(syl1, syl2)
+
+        # TODO: multiple rhymes are possible in one window, include all above threshold.
+        # pick the longest continuous rhyme, starting with strongest (argmax) rhyming syllable
+        i, j = np.unravel_index(rhyme_values_mat.argmax(), rhyme_values_mat.shape) # gets 2d coordinates, not flat
+        rhyme_length = 0 # how long does the rhyme continue for
+        while (i + rhyme_length < n - 1) and (j + rhyme_length < n - 1) and rhyme_values_mat[i+rhyme_length, j+rhyme_length] > 0: #TODO: another threshold place?
+            rhyme_length += 1
+
+
+
+
+        # Ignore rhymes with length 1
+        # if rhyme_length >= self.rhyme_cutoff:
+        if rhyme_length > 0:
+            word_i, word_j = word_list[i], word_list[j]
+            rhyme_syllables = ''.join(syllable_list[i:i+rhyme_length]) # TODO: just pick one variant of syllable sounds
+            # save word ids with this rhyme
+            rhymes = self.rhyme_map.get(rhyme_syllables, [])
+            rhymes.append([word_i, word_j, rhyme_length])
+            self.rhyme_map[rhyme_syllables] = rhymes
+
+
+    def rhyme_heuristic(self, syl1, syl2):
+        """
+
+        :param syl1:
+        :param syl2:
+        :return: int
+        """
+        m,n = len(syl1), len(syl2)
+        rhyme_val_mat = np.full((m, n), -0.1) #TODO: should it be neutral or punishing?
+        for i in range(m):
+            for j in range(n):
+                a = syl1[i]
+                b = syl2[j]
+                if a == b:
+                    rhyme_val_mat = 1.0
+                # TODO: add confusion matrix similar sounds
+                # elif
+
+        # sum of all rhyming sounds
+        rhyme = np.sum(rhyme_val_mat)
+        return rhyme
 
 
 
@@ -246,4 +317,11 @@ class Lyrics:
 
         # Consonants
 
-    # def rhyme_heuristic(self, syllable_matrix, similar_vowels, similar_cons):
+    def get_rhymes(self):
+        """
+        Longer rhymes take priority
+        :return:
+        """
+        rhymes = sorted(self.rhyme_map.items(), key=lambda x: len(x[0]))  # sort by increasing length of rhyme
+        return rhymes
+

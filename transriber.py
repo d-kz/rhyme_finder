@@ -2,11 +2,11 @@ from lyrics import Lyrics
 from colored import fg, bg, attr
 import random
 
-file_name = 'lyrics_fr/Feu_Zoe_short.txt'
+file_name = 'lyrics_fr/Feu_Zoe.txt'
 
 language = 'fr'
 print_stats = True
-lookback = 2
+lookback = 15
 rhyme_cutoff = 2
 l = Lyrics(file_name, language=language, lookback=lookback)
 
@@ -31,7 +31,7 @@ def get_text_in_color(text, color):
     return color + text + res
 
 
-def print_lyrics(words, rhymes, transcription):
+def print_lyrics(words, rhymes, newlines):
     """
     Print original lyrics with rhymes color-coded.
     Longer rhymes take priority
@@ -39,7 +39,6 @@ def print_lyrics(words, rhymes, transcription):
     :param rhymes:
     :return:
     """
-    transcription_lines = transcription.split('\n')
 
     # Color coding rhymes (rhyme_key: color)
     colors = generate_color(len(rhymes))
@@ -49,28 +48,33 @@ def print_lyrics(words, rhymes, transcription):
     words_rhymes = [None for i in range(len(words))]
     for rhyme, word_pairs in rhymes:
         for word_pair in word_pairs:
-            i, j = word_pair
-            words_rhymes[i] = rhyme
-            words_rhymes[j] = rhyme
+            i, j, l = word_pair
+            print i, j, len(words_rhymes)
+            for offset in range(l): # overwrite with longest rhymes
+                words_rhymes[i+offset] = rhyme
+                words_rhymes[j+offset] = rhyme
 
             # if #vowels in a word != len(rhyme), previous word needs to be included too
             # if word[i]
 
     printout = ''
     line = 0
-    for i, word in enumerate(words):
+    for i, word_instance in enumerate(words):
         # color rhymed words
+        word = word_instance.word
         if words_rhymes[i] != None:
             rhyme_str = words_rhymes[i]
             word = get_text_in_color(word, rhyme_color_map[rhyme_str])
         printout += word + ' '
-        # print transcription
-        if '\n' in word:
-            print line
-            printout += get_text_in_color(transcription_lines[line], '#C0C0C0') + '\n'
-            # printout += transcription_lines[line] + '\n'
-            if line < len(transcription_lines) - 2:
-                line += 1
+        if i in newlines:
+            printout += '\n'
+        # # print transcription
+        # if '\n' in word:
+        #     print line
+        #     printout += get_text_in_color(transcription_lines[line], '#C0C0C0') + '\n'
+        #     # printout += transcription_lines[line] + '\n'
+        #     if line < len(transcription_lines) - 2:
+        #         line += 1
 
 
     print printout
@@ -80,8 +84,13 @@ def print_lyrics(words, rhymes, transcription):
 
 
 
-# rhymes = l.get_rhymes()
-# print_lyrics(l.words_orig, rhymes, transcription=l.text)
+
+
+rhymes = l.get_rhymes()
+print rhymes
+
+print_lyrics(l.words, rhymes, l.new_lines)
+
 
 
 
