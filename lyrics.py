@@ -12,17 +12,17 @@ TODOs:
     - input
     - cutoff logic
 - Heuristic for rhyme computation: vowel alignment, consonant similarity
-    - center around vowel, then consonant
     - not only 2 words can rhyme. Rhyme are transitive: if a -> b and b -> c, then a -> c.
-    Add a graph traversal to identify reachability (matrix multiply), like page-rank. (markov property?)
-- breakup rhyme highlighting by syllable: map transcription to original
-    -  might need text syllables too
+    Add a 1-step travelrsal (1 matrix self multiply to be transitivity exactly - reachable in 1 step)
 (nice)
 - rhyme pattern symbolic at the end of the line (to see how the rhyming pattern mixes)
 - breakup rhyme highlighting by syllable: map transcription to original
 - filter 'bad' rhymes
 - what was their annealing for printing?
 DONE:
+- breakup rhyme highlighting by syllable: map transcription to original
+    -  might need text syllables too
+- rhyming: center around vowel, then consonant
 - assemble lyrics back with highlighting (from previous version)
 - Sliding window across syllables
 - Syllable breakup
@@ -67,9 +67,10 @@ class Word:
                     syllable += char
                     i += 1
 
-                self.syllables.append([syllable, vowel_offset])
+                self.syllables.append({'syl':syllable, 'vow':vowel_offset})
                 syllable = ''
                 vowel_offset = 0
+        self.get_word_splits()
 
 
     def __str__(self):
@@ -80,6 +81,25 @@ class Word:
         return self.word.encode('utf8') + "_" + self.transcription.encode('utf8') + "_" +\
         ''.join(self.vowels).encode('utf8') + ''.join(self.consonants).encode('utf8')
 
+
+    def get_word_splits(self):
+        diff = len(self.word) - len(self.transcription)
+        if diff < 0:
+            print "ALERT, diff is less than 0"
+
+        n_syl = len(self.syllables)
+        a = [0]
+        word_split = 0
+        for i in range(n_syl-1):
+            l = len(self.syllables[i]['syl'])
+            word_split = l
+            # add 1 char from each syllable if excess
+            if diff > 0:
+                word_split += 1
+                diff -= 1
+            a.append(word_split)
+        a.append(len(self.word))
+        self.word_splits = [self.word[a[i]:a[i+1]] for i in range(len(a) - 1)]
 
 
 
@@ -216,9 +236,9 @@ class Lyrics:
             if len(syllable_window_q) < self.lookback:
                 word = self.words[i]
                 # insert length of syllables to know how much to remove later
-                for syllable in word.syllables:
+                for syl_i, syllable in enumerate(word.syllables):
                     # push into queue
-                    word_id_q.insert(0, i)
+                    word_id_q.insert(0, {'word': i, 'syl': syl_i})
                     syllable_window_q.insert(0, syllable)
                 i += 1
             else:
@@ -232,10 +252,10 @@ class Lyrics:
 
                 # keep popping 1 word at a time until the lookback is not below needed again
                 # get word_id of the first word that was pushed onto queue
-                first_word_id = word_id_q[-1]
+                first_word_id = word_id_q[-1]['word']
                 # delete queue until the whole word is removed.
                 while len(word_id_q) > 0:
-                    word_id = word_id_q[-1]
+                    word_id = word_id_q[-1]['word']
                     # stop if next word encountered
                     if word_id != first_word_id:
                         break
@@ -284,7 +304,7 @@ class Lyrics:
         # Ignore rhymes with length 1
         # if rhyme_length >= self.rhyme_cutoff:
         if rhyme_length > 0:
-            syllables_strings = [syl[0] for syl in syllable_list]
+            syllables_strings = [syl['syl'] for syl in syllable_list]
             word_i, word_j = word_list[i], word_list[j]
             rhyme_syllables = ''.join(syllables_strings[i:i+rhyme_length]) # TODO: just pick one variant of syllable sounds
             # save word ids with this rhyme
@@ -300,8 +320,8 @@ class Lyrics:
         :param syl2:
         :return: int
         """
-        syl1, vow1 = syl1_tuple
-        syl2, vow2 = syl2_tuple
+        syl1, vow1 = syl1_tuple['syl'], syl1_tuple['vow']
+        syl2, vow2 = syl2_tuple['syl'], syl2_tuple['vow']
 
         l1,l2 = len(syl1), len(syl2)
         rhyme = 0.0
@@ -310,12 +330,12 @@ class Lyrics:
             # cons ahead of vowel
             if vow1+1 < l1 and vow2+1 < l2:
                 if syl1[vow1+1] == syl2[vow2+1]:
-                    rhyme += 0.5
+                    rhyme += 0.0
 
             # cons behind vowel
             if vow1-1 >= 0 and vow2-1 >= 0:
                 if syl1[vow1-1] == syl2[vow2-1]:
-                    rhyme += 0.5
+                    rhyme += 0.0
 
 
         # rhyme_val_mat = np.full((l1, l2), -0.1) #TODO: should it be neutral or punishing?
